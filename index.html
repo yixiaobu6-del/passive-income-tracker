@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>被动收入追踪器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <nav class="bg-emerald-700 text-white p-4 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-2">
+            <h1 class="text-xl font-bold"><i class="fa fa-cloud-upload mr-2"></i>被动收入追踪器</h1>
+            <div class="space-x-2 text-sm flex flex-wrap">
+                <button onclick="showTab('dashboard')" class="tab-btn px-3 py-1 rounded bg-emerald-500">仪表盘</button>
+                <button onclick="showTab('records')" class="tab-btn px-3 py-1 rounded hover:bg-emerald-500"><i class="fa fa-list"></i> 收入记录</button>
+                <button onclick="showTab('add')" class="tab-btn px-3 py-1 rounded hover:bg-emerald-500"><i class="fa fa-plus"></i> 新增</button>
+                <button onclick="showTab('goal')" class="tab-btn px-3 py-1 rounded hover:bg-emerald-500"><i class="fa fa-bullseye"></i> 目标</button>
+                <button onclick="showTab('ideas')" class="tab-btn px-3 py-1 rounded hover:bg-emerald-500"><i class="fa fa-lightbulb-o"></i> 收入来源推荐</button>
+            </div>
+        </div>
+    </nav>
+    <div class="max-w-6xl mx-auto p-4">
+        <!-- 仪表盘 -->
+        <div id="tab-dashboard" class="tab-content">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-xl shadow p-5 text-center"><div class="text-gray-500 text-sm">本月收入</div><div id="monthIncome" class="text-2xl font-bold text-emerald-600">¥0</div></div>
+                <div class="bg-white rounded-xl shadow p-5 text-center"><div class="text-gray-500 text-sm">总收入</div><div id="totalIncome" class="text-2xl font-bold text-indigo-600">¥0</div></div>
+                <div class="bg-white rounded-xl shadow p-5 text-center"><div class="text-gray-500 text-sm">月均收入</div><div id="avgIncome" class="text-2xl font-bold text-blue-600">¥0</div></div>
+                <div class="bg-white rounded-xl shadow p-5 text-center"><div class="text-gray-500 text-sm">多样性评分</div><div id="diversityScore" class="text-2xl font-bold text-purple-600">0</div></div>
+            </div>
+            <!-- 风险预警 -->
+            <div id="riskAlerts" class="hidden mb-4 space-y-2"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow p-5"><h3 class="font-bold mb-3"><i class="fa fa-pie-chart mr-2 text-emerald-600"></i>收入来源分布</h3><canvas id="pieChart" height="200"></canvas></div>
+                <div class="bg-white rounded-xl shadow p-5"><h3 class="font-bold mb-3"><i class="fa fa-line-chart mr-2 text-emerald-600"></i>月度收入趋势 & 预测</h3><canvas id="lineChart" height="200"></canvas></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow p-5"><h3 class="font-bold mb-3"><i class="fa fa-bar-chart mr-2 text-emerald-600"></i>各来源趋势</h3><canvas id="sourceChart" height="200"></canvas></div>
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h3 class="font-bold mb-3"><i class="fa fa-calculator mr-2 text-emerald-600"></i>收入分析</h3>
+                    <div id="sourceGrowth" class="space-y-2 text-sm"></div>
+                    <div id="predictionDisplay" class="mt-4 pt-4 border-t text-sm"></div>
+                    <div class="mt-4 pt-4 border-t">
+                        <h4 class="font-bold text-sm mb-2"><i class="fa fa-trophy mr-1 text-emerald-600"></i>目标进度</h4>
+                        <div id="goalProgress" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 收入记录 -->
+        <div id="tab-records" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow p-5">
+                <h3 class="font-bold mb-4"><i class="fa fa-list mr-2 text-emerald-600"></i>收入记录</h3>
+                <div class="mb-4 flex flex-wrap gap-2">
+                    <select id="filterSource" onchange="renderRecords()" class="border rounded p-2 text-sm"><option value="all">全部来源</option></select>
+                    <select id="filterYear" onchange="renderRecords()" class="border rounded p-2 text-sm"></select>
+                    <select id="filterMonth" onchange="renderRecords()" class="border rounded p-2 text-sm"><option value="all">全部月份</option></select>
+                    <button onclick="exportCSV()" class="bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600"><i class="fa fa-download mr-1"></i>导出CSV</button>
+                    <button onclick="clearAllData()" class="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600"><i class="fa fa-trash mr-1"></i>清空</button>
+                </div>
+                <div id="recordsList" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- 新增 -->
+        <div id="tab-add" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow p-6 max-w-lg mx-auto">
+                <h3 class="font-bold mb-4"><i class="fa fa-plus-circle mr-2 text-emerald-600"></i>新增被动收入</h3>
+                <div class="space-y-4">
+                    <div><label class="block text-sm text-gray-600 mb-1">来源类型</label>
+                        <select id="incomeSource" class="w-full border rounded p-2">
+                            <option value="课程">课程</option><option value="电子书">电子书</option>
+                            <option value="广告">广告</option><option value="咨询">咨询</option>
+                            <option value="会员订阅">会员订阅</option><option value="联盟营销">联盟营销</option>
+                            <option value="模板素材">模板素材</option><option value="版权收入">版权收入</option>
+                            <option value="投资理财">投资理财</option><option value="租金收入">租金收入</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-sm text-gray-600 mb-1">收入金额 (¥)</label><input type="number" id="incomeAmount" class="w-full border rounded p-2" placeholder="0.00"></div>
+                    <div><label class="block text-sm text-gray-600 mb-1">月份</label><select id="incomeMonth" class="w-full border rounded p-2"></select></div>
+                    <div><label class="block text-sm text-gray-600 mb-1">年份</label><input type="number" id="incomeYear" class="w-full border rounded p-2"></div>
+                    <div><label class="block text-sm text-gray-600 mb-1">备注</label><input type="text" id="incomeNote" class="w-full border rounded p-2" placeholder="可选"></div>
+                    <button onclick="addIncome()" class="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700"><i class="fa fa-save mr-2"></i>保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 目标设定 -->
+        <div id="tab-goal" class="tab-content hidden">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h3 class="font-bold mb-4"><i class="fa fa-bullseye mr-2 text-emerald-600"></i>收入目标设定（多级目标）</h3>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-medium text-blue-700 mb-1"><i class="fa fa-flag mr-1"></i>短期目标（1-3个月）</label><input type="number" id="goalShortTerm" class="w-full border rounded p-2 text-lg" placeholder="月收入目标" value="10000"></div>
+                        <div class="p-4 bg-indigo-50 rounded-lg"><label class="block text-sm font-medium text-indigo-700 mb-1"><i class="fa fa-flag-checkered mr-1"></i>中期目标（3-12个月）</label><input type="number" id="goalMidTerm" class="w-full border rounded p-2 text-lg" placeholder="月收入目标" value="30000"></div>
+                        <div class="p-4 bg-purple-50 rounded-lg"><label class="block text-sm font-medium text-purple-700 mb-1"><i class="fa fa-trophy mr-1"></i>长期目标（1-5年）</label><input type="number" id="goalLongTerm" class="w-full border rounded p-2 text-lg" placeholder="月收入目标" value="100000"></div>
+                        <button onclick="saveGoal()" class="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700"><i class="fa fa-save mr-2"></i>保存目标</button>
+                    </div>
+                    <div id="goalAnalysis" class="mt-6 p-4 bg-gray-50 rounded-lg"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 收入来源推荐 -->
+        <div id="tab-ideas" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow p-6">
+                <h3 class="font-bold mb-4"><i class="fa fa-lightbulb-o mr-2 text-emerald-600"></i>10种被动收入类型参考</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="ideaGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SOURCES = ['课程', '电子书', '广告', '咨询', '会员订阅', '联盟营销', '模板素材', '版权收入', '投资理财', '租金收入', '其他'];
+        const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#ec4899', '#6366f1', '#14b8a6', '#6b7280'];
+
+        const INCOME_IDEAS = [
+            { name: '在线课程', desc: '录制专业知识课程，一次制作长期销售', platforms: '网易云课堂/腾讯课堂/知识星球', income: '¥500-50000/月', effort: '前期投入大' },
+            { name: '电子书/数字出版物', desc: '编写电子书/PDF指南/模板包', platforms: '亚马逊KDP/微信读书/Gumroad', income: '¥200-20000/月', effort: '写作周期1-3月' },
+            { name: '广告收入', desc: '通过博客/YouTube/公众号展示广告', platforms: 'Google AdSense/百度联盟/微信广告', income: '¥100-50000/月', effort: '需持续产出内容' },
+            { name: '会员订阅', desc: '建立付费社群/会员专区/Newsletter', platforms: '知识星球/Patreon/Substack', income: '¥500-50000/月', effort: '持续维护社群' },
+            { name: '联盟营销/带货', desc: '推荐产品赚取佣金，无需自己发货', platforms: '淘宝联盟/亚马逊联盟/美团联盟', income: '¥200-50000/月', effort: '需流量基础' },
+            { name: '数字模板/素材', desc: '设计模板、图标、字体等数字产品', platforms: 'Envato/稿定设计/Canva模板', income: '¥500-10000/月', effort: '设计能力要求' },
+            { name: '版权收入', desc: '摄影/音乐/插画等作品授权使用', platforms: '视觉中国/Shutterstock/网易云音乐', income: '¥100-10000/月', effort: '随缘型收入' },
+            { name: '投资理财收益', desc: '股息/基金收益/债券利息', platforms: '券商/基金平台', income: '¥500-100000+/月', effort: '需本金积累' },
+            { name: '咨询/顾问服务', desc: '按小时或按项目提供专业咨询', platforms: '在行/知乎/个人网站', income: '¥2000-50000/月', effort: '需专业资质' },
+            { name: '租金/资产收益', desc: '房产/设备/车位等资产出租', platforms: '贝壳/闲鱼/线下', income: '¥1000-50000/月', effort: '需资产积累' }
+        ];
+
+        let records = JSON.parse(localStorage.getItem('passiveIncome') || '[]');
+        let goal = JSON.parse(localStorage.getItem('incomeGoal') || '{"shortTerm":10000,"midTerm":30000,"longTerm":100000}');
+        let pieChartInstance, lineChartInstance, sourceChartInstance;
+
+        function save() { localStorage.setItem('passiveIncome', JSON.stringify(records)); localStorage.setItem('incomeGoal', JSON.stringify(goal)); }
+
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.className = 'tab-btn px-3 py-1 rounded hover:bg-emerald-500');
+            document.getElementById('tab-' + name).classList.remove('hidden');
+            if (name === 'dashboard') renderDashboard();
+            if (name === 'records') renderRecords();
+            if (name === 'goal') renderGoal();
+            if (name === 'ideas') renderIdeas();
+        }
+
+        // --- 收入来源多样性评分 ---
+        function calcDiversityScore() {
+            const srcData = {};
+            SOURCES.forEach(s => srcData[s] = records.filter(r => r.source === s).reduce((sum, r) => sum + r.amount, 0));
+            const total = Object.values(srcData).reduce((s, v) => s + v, 0);
+            if (total === 0) return 0;
+            const activeSources = SOURCES.filter(s => srcData[s] > 0).length;
+            // 来源数量得分（最高50分）
+            const countScore = Math.min(50, activeSources * 10);
+            // 均衡度得分（最高50分）- 使用信息熵
+            let entropy = 0;
+            SOURCES.forEach(s => {
+                if (srcData[s] > 0) {
+                    const p = srcData[s] / total;
+                    entropy -= p * Math.log2(p);
+                }
+            });
+            const maxEntropy = Math.log2(activeSources || 1);
+            const evennessScore = maxEntropy > 0 ? (entropy / maxEntropy) * 50 : 0;
+            return Math.round(countScore + evennessScore);
+        }
+
+        // --- 风险提醒 ---
+        function checkRiskAlerts() {
+            const alerts = [];
+            const now = new Date(); const curYear = now.getFullYear(); const curMonth = now.getMonth() + 1;
+
+            // 规则1：连续2个月收入下降超过20%
+            for (let i = 0; i < 2; i++) {
+                const m = curMonth - i;
+                const y = curYear;
+                const prevM = m - 1 <= 0 ? 12 + (m - 1) : m - 1;
+                const prevY = m - 1 <= 0 ? y - 1 : y;
+                const curTotal = records.filter(r => r.year === y && r.month === m).reduce((s, r) => s + r.amount, 0);
+                const prevTotal = records.filter(r => r.year === prevY && r.month === prevM).reduce((s, r) => s + r.amount, 0);
+                if (prevTotal > 0 && curTotal > 0 && ((prevTotal - curTotal) / prevTotal) > 0.2) {
+                    alerts.push({ type: 'red', icon: 'fa-exclamation-circle', text: `收入预警：从${prevY}年${prevM}月到${y}年${m}月，收入下降超过20%（${prevTotal.toFixed(0)} -> ${curTotal.toFixed(0)}）。建议立即排查原因。` });
+                    break;
+                }
+            }
+
+            // 规则2：收入来源单一（某项占总收入>70%）
+            const srcData = {};
+            SOURCES.forEach(s => srcData[s] = records.filter(r => r.source === s).reduce((sum, r) => sum + r.amount, 0));
+            const total = Object.values(srcData).reduce((s, v) => s + v, 0);
+            if (total > 0) {
+                SOURCES.forEach(s => {
+                    if (srcData[s] > 0 && (srcData[s] / total) > 0.7) {
+                        alerts.push({ type: 'yellow', icon: 'fa-warning', text: `依赖风险："${s}"占总收入${(srcData[s]/total*100).toFixed(0)}%，超过70%警戒线。建议拓展新收入来源降低风险。` });
+                    }
+                });
+            }
+
+            // 规则3：新收入来源连续3个月无增长
+            const allMonths = [...new Set(records.map(r => r.year + '-' + String(r.month).padStart(2, '0')))].sort();
+            if (allMonths.length >= 3) {
+                const lastMonths = allMonths.slice(-3);
+                SOURCES.forEach(s => {
+                    const vals = lastMonths.map(m => { const [y, mo] = m.split('-').map(Number); return records.filter(r => r.source === s && r.year === y && r.month === mo).reduce((sum, r) => sum + r.amount, 0); });
+                    if (vals.every(v => v > 0) && vals[0] === vals[1] && vals[1] === vals[2]) {
+                        alerts.push({ type: 'blue', icon: 'fa-info-circle', text: `增长提醒："${s}"连续3个月收入无变化（¥${vals[0].toFixed(0)}），建议检查是否需要优化推广策略。` });
+                    }
+                });
+            }
+
+            return alerts;
+        }
+
+        // ---------- 仪表盘 ----------
+        function renderDashboard() {
+            const now = new Date(); const curYear = now.getFullYear(); const curMonth = now.getMonth() + 1;
+            const monthRecords = records.filter(r => r.year === curYear && r.month === curMonth);
+            const monthIncome = monthRecords.reduce((s, r) => s + r.amount, 0);
+            const totalIncome = records.reduce((s, r) => s + r.amount, 0);
+            const allMonths = [...new Set(records.map(r => r.year + '-' + String(r.month).padStart(2, '0')))].sort();
+            const monthlyTotals = allMonths.map(m => { const [y, mo] = m.split('-').map(Number); return records.filter(r => r.year === y && r.month === mo).reduce((s, r) => s + r.amount, 0); });
+            const avgIncome = monthlyTotals.length ? monthlyTotals.reduce((s, v) => s + v, 0) / monthlyTotals.length : 0;
+
+            document.getElementById('monthIncome').textContent = '¥' + monthIncome.toFixed(2);
+            document.getElementById('totalIncome').textContent = '¥' + totalIncome.toFixed(2);
+            document.getElementById('avgIncome').textContent = '¥' + avgIncome.toFixed(2);
+            document.getElementById('diversityScore').textContent = calcDiversityScore() + '/100';
+
+            // 风险预警
+            const alerts = checkRiskAlerts();
+            const alertDiv = document.getElementById('riskAlerts');
+            if (alerts.length > 0) {
+                alertDiv.classList.remove('hidden');
+                const colors = { red: 'bg-red-50 border-red-500 text-red-700', yellow: 'bg-yellow-50 border-yellow-500 text-yellow-700', blue: 'bg-blue-50 border-blue-500 text-blue-700' };
+                alertDiv.innerHTML = alerts.map(a => `<div class="flex items-start gap-3 p-3 rounded-lg border-l-4 ${colors[a.type]}"><i class="fa ${a.icon} mt-0.5"></i><div class="text-sm">${a.text}</div></div>`).join('');
+            } else {
+                alertDiv.classList.add('hidden');
+            }
+
+            // 饼图
+            const srcData = {};
+            SOURCES.forEach(s => srcData[s] = records.filter(r => r.source === s).reduce((sum, r) => sum + r.amount, 0));
+            if (pieChartInstance) pieChartInstance.destroy();
+            pieChartInstance = new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: { labels: SOURCES, datasets: [{ data: SOURCES.map(s => srcData[s]), backgroundColor: COLORS }] },
+                options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+
+            // 趋势 + 预测
+            const labels = allMonths.slice(-12);
+            const values = labels.map(m => { const [y, mo] = m.split('-').map(Number); return records.filter(r => r.year === y && r.month === mo).reduce((s, r) => s + r.amount, 0); });
+
+            // 收入预测（基于过去3个月）
+            const prediction = predictIncome(values);
+            const fullLabels = [...labels];
+            const actualValues = [...values];
+            const predictedValues = [];
+
+            if (prediction.months.length > 0) {
+                prediction.months.forEach((m, i) => {
+                    fullLabels.push('预测' + (i + 1) + '月');
+                    actualValues.push(null);
+                    predictedValues.push(m);
+                });
+            }
+
+            if (lineChartInstance) lineChartInstance.destroy();
+            lineChartInstance = new Chart(document.getElementById('lineChart'), {
+                type: 'line',
+                data: {
+                    labels: fullLabels,
+                    datasets: [
+                        { label: '实际收入', data: actualValues, borderColor: '#10b981', fill: false, tension: 0.3, spanGaps: false },
+                        predictedValues.length ? { label: '预测趋势', data: [...new Array(values.length - 1).fill(null), values[values.length - 1], ...predictedValues], borderColor: '#f59e0b', borderDash: [5,5], fill: false, spanGaps: true, pointBorderColor: '#f59e0b', pointBackgroundColor: '#fff' } : null,
+                        { label: '短期目标', data: fullLabels.map(() => goal.shortTerm), borderColor: '#3b82f6', borderDash: [3,3], fill: false, pointRadius: 0 },
+                        { label: '中期目标', data: fullLabels.map(() => goal.midTerm), borderColor: '#8b5cf6', borderDash: [3,3], fill: false, pointRadius: 0 },
+                        { label: '长期目标', data: fullLabels.map(() => goal.longTerm), borderColor: '#ef4444', borderDash: [3,3], fill: false, pointRadius: 0 }
+                    ].filter(Boolean)
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+
+            // 各来源趋势
+            if (sourceChartInstance) sourceChartInstance.destroy();
+            const activeSources = SOURCES.filter(s => srcData[s] > 0);
+            const srcDatasets = activeSources.map((s, i) => {
+                const vals = labels.map(m => { const [y, mo] = m.split('-').map(Number); return records.filter(r => r.source === s && r.year === y && r.month === mo).reduce((sum, r) => sum + r.amount, 0); });
+                return { label: s, data: vals, borderColor: COLORS[i], fill: false, tension: 0.3 };
+            });
+            sourceChartInstance = new Chart(document.getElementById('sourceChart'), {
+                type: 'line',
+                data: { labels, datasets: srcDatasets },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+
+            // 增长分析
+            const growthDiv = document.getElementById('sourceGrowth');
+            growthDiv.innerHTML = activeSources.map((s, i) => {
+                const vals = labels.map(m => { const [y, mo] = m.split('-').map(Number); return records.filter(r => r.source === s && r.year === y && r.month === mo).reduce((sum, r) => sum + r.amount, 0); }).filter(v => v > 0);
+                const rate = vals.length >= 2 ? ((vals[vals.length-1] - vals[0]) / vals[0] * 100).toFixed(1) : 'N/A';
+                return `<div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full" style="background:${COLORS[i]}"></span><span class="flex-1">${s}</span><span class="font-bold">${rate === 'N/A' ? '数据不足' : (parseFloat(rate) >= 0 ? '+' : '') + rate + '%'}</span></div>`;
+            }).join('');
+
+            // 预测显示
+            const predDiv = document.getElementById('predictionDisplay');
+            if (prediction.months.length > 0 && prediction.monthlyGrowth !== 0) {
+                const monthsToTarget = prediction.monthlyGrowth > 0 ? Math.ceil((goal.shortTerm - monthIncome) / (prediction.monthlyGrowth)) : -1;
+                predDiv.innerHTML = `
+                    <h4 class="font-bold text-sm mb-2"><i class="fa fa-line-chart mr-1 text-emerald-600"></i>收入预测</h4>
+                    <div class="text-sm space-y-1">
+                        <p>月均增长率：<span class="font-medium ${prediction.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}">${prediction.monthlyGrowth >= 0 ? '+' : ''}${prediction.monthlyGrowth.toFixed(1)}%</span></p>
+                        <p>未来3个月预测：${prediction.months.map((v, i) => `第${i+1}月 ¥${v.toFixed(0)}`).join(' → ')}</p>
+                        ${monthsToTarget > 0 ? `<p class="text-blue-600 font-medium">预计 <span class="text-lg">${monthsToTarget}</span> 个月后达到短期目标 ¥${goal.shortTerm.toLocaleString()}</p>` :
+                        prediction.monthlyGrowth <= 0 ? '<p class="text-orange-600">当前呈下降趋势，建议调整策略</p>' :
+                        '<p class="text-green-600">当前收入已超过短期目标！</p>'}
+                    </div>`;
+            } else {
+                predDiv.innerHTML = '<div class="text-xs text-gray-400">需至少3个月数据才能进行预测分析</div>';
+            }
+
+            // 目标进度
+            const goalDiv = document.getElementById('goalProgress');
+            const shortPct = goal.shortTerm > 0 ? Math.min(100, (monthIncome / goal.shortTerm) * 100) : 0;
+            const midPct = goal.midTerm > 0 ? Math.min(100, (monthIncome / goal.midTerm) * 100) : 0;
+            const longPct = goal.longTerm > 0 ? Math.min(100, (monthIncome / goal.longTerm) * 100) : 0;
+
+            goalDiv.innerHTML = `
+                <div class="space-y-2">
+                    <div><div class="flex justify-between text-xs"><span>短期目标 ¥${goal.shortTerm.toLocaleString()}</span><span class="font-bold ${shortPct >= 100 ? 'text-green-600' : 'text-blue-600'}">${shortPct.toFixed(0)}%</span></div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5"><div class="${shortPct >= 100 ? 'bg-green-500' : 'bg-blue-500'} h-1.5 rounded-full" style="width:${shortPct}%"></div></div></div>
+                    <div><div class="flex justify-between text-xs"><span>中期目标 ¥${goal.midTerm.toLocaleString()}</span><span class="font-bold ${midPct >= 100 ? 'text-green-600' : 'text-indigo-600'}">${midPct.toFixed(0)}%</span></div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5"><div class="${midPct >= 100 ? 'bg-green-500' : 'bg-indigo-500'} h-1.5 rounded-full" style="width:${midPct}%"></div></div></div>
+                    <div><div class="flex justify-between text-xs"><span>长期目标 ¥${goal.longTerm.toLocaleString()}</span><span class="font-bold ${longPct >= 100 ? 'text-green-600' : 'text-purple-600'}">${longPct.toFixed(0)}%</span></div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5"><div class="${longPct >= 100 ? 'bg-green-500' : 'bg-purple-500'} h-1.5 rounded-full" style="width:${longPct}%"></div></div></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">总收入：¥${totalIncome.toFixed(0)}</div>
+            `;
+
+            // 里程碑庆祝
+            checkMilestones(monthIncome, totalIncome);
+
+            // 收入来源效率分析
+            renderEfficiencyAnalysis();
+        }
+
+        // --- 里程碑庆祝系统 ---
+        let milestoneHistory = JSON.parse(localStorage.getItem('incomeMilestoneHistory') || '[]');
+
+        function checkMilestones(monthIncome, totalIncome) {
+            const milestones = [
+                { value: 1000, label: '月入千元', color: '#10b981', icon: 'fa-star' },
+                { value: 5000, label: '月入五千', color: '#3b82f6', icon: 'fa-star' },
+                { value: 10000, label: '月入破万', color: '#8b5cf6', icon: 'fa-star' },
+                { value: 30000, label: '月入三万', color: '#f59e0b', icon: 'fa-trophy' },
+                { value: 50000, label: '月入五万', color: '#ef4444', icon: 'fa-trophy' },
+                { value: 100000, label: '月入十万', color: '#ec4899', icon: 'fa-trophy' },
+            ];
+
+            const totalMilestones = [
+                { value: 50000, label: '累计收入5万', color: '#10b981', icon: 'fa-diamond' },
+                { value: 100000, label: '累计收入10万', color: '#3b82f6', icon: 'fa-diamond' },
+                { value: 500000, label: '累计收入50万', color: '#8b5cf6', icon: 'fa-diamond' },
+                { value: 1000000, label: '累计收入100万', color: '#f59e0b', icon: 'fa-diamond' },
+            ];
+
+            const allMs = [
+                ...milestones.filter(m => monthIncome >= m.value),
+                ...totalMilestones.filter(m => totalIncome >= m.value)
+            ];
+
+            const newMilestones = allMs.filter(m => !milestoneHistory.includes(m.label));
+            if (newMilestones.length > 0) {
+                newMilestones.forEach(m => milestoneHistory.push(m.label));
+                localStorage.setItem('incomeMilestoneHistory', JSON.stringify(milestoneHistory));
+                // 显示庆祝动画
+                showCelebration(newMilestones);
+            }
+        }
+
+        function showCelebration(milestones) {
+            // 创建庆祝弹窗
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+            overlay.id = 'celebrationOverlay';
+            overlay.onclick = function(e) { if (e.target === this) this.remove(); };
+
+            // 五彩纸屑动画效果
+            const colors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#f97316'];
+            const confetti = Array.from({length: 40}, (_, i) => {
+                const c = colors[i % colors.length];
+                const left = Math.random() * 100;
+                const delay = Math.random() * 2;
+                const size = 4 + Math.random() * 8;
+                const duration = 1.5 + Math.random() * 2;
+                return `<div style="position:absolute;left:${left}%;top:-10px;width:${size}px;height:${size}px;background:${c};border-radius:${Math.random() > 0.5 ? '50%' : '2px'};animation:confettiFall ${duration}s ease-in ${delay}s infinite;"></div>`;
+            }).join('');
+
+            overlay.innerHTML = `
+                <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md mx-4 text-center relative overflow-hidden animate-bounce-in">
+                    ${confetti}
+                    <div class="relative z-10">
+                        <div class="text-6xl mb-4">🎉</div>
+                        <h2 class="text-2xl font-black text-gray-800 mb-2">恭喜达成里程碑！</h2>
+                        <div class="space-y-2 mb-6">
+                            ${milestones.map(m => `
+                                <div class="flex items-center gap-3 p-3 rounded-xl" style="background:${m.color}15">
+                                    <i class="fa ${m.icon} text-2xl" style="color:${m.color}"></i>
+                                    <div class="text-left">
+                                        <div class="font-bold text-lg" style="color:${m.color}">${m.label}</div>
+                                        <div class="text-sm text-gray-500">持续努力，下一个里程碑在等着你！</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button onclick="document.getElementById('celebrationOverlay').remove()" class="px-8 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 font-medium transition">
+                            <i class="fa fa-check mr-1"></i> 继续前进
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            // 注入动画样式
+            if (!document.getElementById('celebrationStyles')) {
+                const style = document.createElement('style');
+                style.id = 'celebrationStyles';
+                style.textContent = `
+                    @keyframes confettiFall {
+                        0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+                    }
+                    @keyframes bounceIn {
+                        0% { transform: scale(0.3); opacity: 0; }
+                        50% { transform: scale(1.05); }
+                        70% { transform: scale(0.95); }
+                        100% { transform: scale(1); opacity: 1; }
+                    }
+                    .animate-bounce-in { animation: bounceIn 0.6s ease; }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
+        // --- 收入来源效率分析 ---
+        const SOURCE_EFFORT = {
+            '课程': { timePerUnit: 40, unit: '小时/课程', setupTime: 80, passiveLevel: 4 },
+            '电子书': { timePerUnit: 60, unit: '小时/本', setupTime: 100, passiveLevel: 5 },
+            '广告': { timePerUnit: 20, unit: '小时/月', setupTime: 60, passiveLevel: 3 },
+            '咨询': { timePerUnit: 2, unit: '小时/次', setupTime: 10, passiveLevel: 2 },
+            '会员订阅': { timePerUnit: 15, unit: '小时/月', setupTime: 40, passiveLevel: 4 },
+            '联盟营销': { timePerUnit: 10, unit: '小时/月', setupTime: 30, passiveLevel: 3 },
+            '模板素材': { timePerUnit: 8, unit: '小时/套', setupTime: 20, passiveLevel: 5 },
+            '版权收入': { timePerUnit: 5, unit: '小时/月', setupTime: 15, passiveLevel: 5 },
+            '投资理财': { timePerUnit: 3, unit: '小时/月', setupTime: 20, passiveLevel: 5 },
+            '租金收入': { timePerUnit: 2, unit: '小时/月', setupTime: 10, passiveLevel: 5 },
+            '其他': { timePerUnit: 10, unit: '小时/月', setupTime: 10, passiveLevel: 3 }
+        };
+
+        function renderEfficiencyAnalysis() {
+            const container = document.getElementById('sourceGrowth');
+            if (!container) return;
+
+            // 计算每个来源的效率和被动指数
+            const efficiencyData = SOURCES.map(source => {
+                const srcRecords = records.filter(r => r.source === source);
+                const total = srcRecords.reduce((s, r) => s + r.amount, 0);
+                if (total === 0) return null;
+                const effort = SOURCE_EFFORT[source] || { timePerUnit: 10, passiveLevel: 3 };
+                // 估算投入时间：最近一个月投入时间
+                const monthCount = srcRecords.length || 1;
+                const totalHours = effort.timePerUnit * monthCount + effort.setupTime;
+                const hourlyRate = totalHours > 0 ? total / totalHours : 0;
+                return { source, total, hourlyRate, passiveLevel: effort.passiveLevel, monthCount };
+            }).filter(Boolean);
+
+            if (efficiencyData.length === 0) return;
+
+            // 按时薪排序
+            efficiencyData.sort((a, b) => b.hourlyRate - a.hourlyRate);
+
+            // 在第二个位置渲染效率分析
+            const dashboardRightPanel = container.closest('#sourceGrowth');
+            if (dashboardRightPanel) {
+                container.innerHTML = efficiencyData.map((d, i) => {
+                    const starStr = '★'.repeat(d.passiveLevel) + '☆'.repeat(5 - d.passiveLevel);
+                    return `<div class="flex items-center gap-2 p-2 ${i === 0 ? 'bg-green-50 rounded-lg' : ''}">
+                        <span class="w-3 h-3 rounded-full" style="background:${COLORS[SOURCES.indexOf(d.source)]}"></span>
+                        <span class="flex-1 text-xs">${d.source}</span>
+                        <span class="text-xs font-medium">¥${d.hourlyRate.toFixed(0)}/时</span>
+                        <span class="text-xs text-amber-500">${starStr}</span>
+                    </div>`;
+                }).join('');
+
+                // 添加最高效和最低效标记
+                const best = efficiencyData[0];
+                const worst = efficiencyData[efficiencyData.length - 1];
+                const extraHtml = `
+                    <div class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                        <p><i class="fa fa-rocket text-green-600 mr-1"></i>最有效率：${best.source}（¥${best.hourlyRate.toFixed(0)}/时）</p>
+                        <p><i class="fa fa-warning text-orange-600 mr-1"></i>可优化：${worst.source}（¥${worst.hourlyRate.toFixed(0)}/时）</p>
+                    </div>
+                `;
+                container.innerHTML += extraHtml;
+            }
+        }
+        function predictIncome(data) {
+            if (data.length < 3) return { months: [], monthlyGrowth: 0 };
+            const recent3 = data.slice(-3);
+            const n = recent3.length;
+            const xMean = (n - 1) / 2;
+            const yMean = recent3.reduce((s, v) => s + v, 0) / n;
+            let num = 0, den = 0;
+            for (let i = 0; i < n; i++) { num += (i - xMean) * (recent3[i] - yMean); den += (i - xMean) ** 2; }
+            const slope = den !== 0 ? num / den : 0;
+
+            // 月均增长率
+            const monthlyGrowth = yMean > 0 ? (slope / yMean) * 100 : 0;
+
+            // 预测未来3个月
+            const months = [];
+            for (let i = 1; i <= 3; i++) {
+                const pred = slope * (n - 1 + i) + (yMean - slope * xMean);
+                months.push(Math.max(0, pred));
+            }
+            return { months, monthlyGrowth };
+        }
+
+        // ---------- 记录 ----------
+        function renderRecords() {
+            const src = document.getElementById('filterSource').value;
+            const year = parseInt(document.getElementById('filterYear').value);
+            const month = document.getElementById('filterMonth').value;
+            let filtered = records;
+            if (src !== 'all') filtered = filtered.filter(r => r.source === src);
+            if (year) filtered = filtered.filter(r => r.year === year);
+            if (month !== 'all') filtered = filtered.filter(r => r.month === parseInt(month));
+            filtered.sort((a, b) => b.year - a.year || b.month - a.month);
+
+            const list = document.getElementById('recordsList');
+            list.innerHTML = filtered.map(r => `<div class="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100 border-l-4 border-emerald-500">
+                <div><div class="font-medium">${r.source} ${r.note ? '- ' + r.note : ''}</div><div class="text-xs text-gray-500">${r.year}年${r.month}月</div></div>
+                <div class="flex items-center gap-3"><span class="font-bold text-emerald-600">¥${r.amount.toFixed(2)}</span><button onclick="deleteRecord(${r.id})" class="text-red-400 hover:text-red-600"><i class="fa fa-trash"></i></button></div>
+            </div>`).join('') || '<div class="text-center text-gray-400 py-8">暂无记录</div>';
+        }
+
+        function deleteRecord(id) { records = records.filter(r => r.id !== id); save(); renderRecords(); renderDashboard(); }
+
+        function addIncome() {
+            const source = document.getElementById('incomeSource').value;
+            const amount = parseFloat(document.getElementById('incomeAmount').value);
+            const month = parseInt(document.getElementById('incomeMonth').value);
+            const year = parseInt(document.getElementById('incomeYear').value);
+            const note = document.getElementById('incomeNote').value;
+            if (!amount || !month || !year) { alert('请填写完整信息'); return; }
+            records.push({ id: Date.now(), source, amount, month, year, note, createdAt: new Date().toISOString() });
+            save(); renderDashboard();
+            document.getElementById('incomeAmount').value = ''; document.getElementById('incomeNote').value = '';
+            showTab('records'); renderRecords();
+        }
+
+        function clearAllData() { if (confirm('确定清空所有数据？')) { records = []; save(); renderRecords(); renderDashboard(); } }
+
+        // ---------- 目标（增强版）----------
+        function renderGoal() {
+            document.getElementById('goalShortTerm').value = goal.shortTerm;
+            document.getElementById('goalMidTerm').value = goal.midTerm;
+            document.getElementById('goalLongTerm').value = goal.longTerm;
+            updateGoalAnalysis();
+        }
+
+        function saveGoal() {
+            const s = parseFloat(document.getElementById('goalShortTerm').value);
+            const m = parseFloat(document.getElementById('goalMidTerm').value);
+            const l = parseFloat(document.getElementById('goalLongTerm').value);
+            if (s > 0) goal.shortTerm = s;
+            if (m > 0) goal.midTerm = m;
+            if (l > 0) goal.longTerm = l;
+            save();
+            updateGoalAnalysis();
+            renderDashboard();
+            showToast('目标已保存');
+        }
+
+        function updateGoalAnalysis() {
+            const now = new Date(); const curYear = now.getFullYear(); const curMonth = now.getMonth() + 1;
+            const monthIncome = records.filter(r => r.year === curYear && r.month === curMonth).reduce((s, r) => s + r.amount, 0);
+            const totalIncome = records.reduce((s, r) => s + r.amount, 0);
+
+            // 计算每日/每周/每月需要达成的收入
+            const shortGap = Math.max(0, goal.shortTerm - monthIncome);
+            const midGap = Math.max(0, goal.midTerm - monthIncome);
+            const longGap = Math.max(0, goal.longTerm - monthIncome);
+
+            const analysis = document.getElementById('goalAnalysis');
+            analysis.innerHTML = `
+                <h4 class="font-medium mb-2">多级目标差距分析</h4>
+                <div class="space-y-3 text-sm">
+                    <div class="p-3 bg-blue-50 rounded">
+                        <span class="font-medium text-blue-700">短期目标（¥${goal.shortTerm.toLocaleString()}/月）</span>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div>差距：<span class="font-bold text-red-600">¥${shortGap.toFixed(0)}</span></div>
+                            <div>每日需：<span class="font-bold">¥${shortGap > 0 ? (shortGap / 30).toFixed(0) : 0}</span></div>
+                            <div>每周需：<span class="font-bold">¥${shortGap > 0 ? (shortGap / 4).toFixed(0) : 0}</span></div>
+                            <div>进度：<span class="font-bold ${monthIncome >= goal.shortTerm ? 'text-green-600' : 'text-orange-600'}">${goal.shortTerm > 0 ? (monthIncome / goal.shortTerm * 100).toFixed(1) : 0}%</span></div>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded">
+                        <span class="font-medium text-indigo-700">中期目标（¥${goal.midTerm.toLocaleString()}/月）</span>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div>差距：<span class="font-bold text-red-600">¥${midGap.toFixed(0)}</span></div>
+                            <div>每日需：<span class="font-bold">¥${midGap > 0 ? (midGap / 30).toFixed(0) : 0}</span></div>
+                            <div>每周需：<span class="font-bold">¥${midGap > 0 ? (midGap / 4).toFixed(0) : 0}</span></div>
+                            <div>进度：<span class="font-bold ${monthIncome >= goal.midTerm ? 'text-green-600' : 'text-orange-600'}">${goal.midTerm > 0 ? (monthIncome / goal.midTerm * 100).toFixed(1) : 0}%</span></div>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-purple-50 rounded">
+                        <span class="font-medium text-purple-700">长期目标（¥${goal.longTerm.toLocaleString()}/月）</span>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div>差距：<span class="font-bold text-red-600">¥${longGap.toFixed(0)}</span></div>
+                            <div>每日需：<span class="font-bold">¥${longGap > 0 ? (longGap / 30).toFixed(0) : 0}</span></div>
+                            <div>每周需：<span class="font-bold">¥${longGap > 0 ? (longGap / 4).toFixed(0) : 0}</span></div>
+                            <div>进度：<span class="font-bold ${monthIncome >= goal.longTerm ? 'text-green-600' : 'text-orange-600'}">${goal.longTerm > 0 ? (monthIncome / goal.longTerm * 100).toFixed(1) : 0}%</span></div>
+                        </div>
+                    </div>
+                </div>
+                ${shortGap > 0 ? `<div class="mt-3 p-3 bg-gray-50 rounded text-sm">
+                    <i class="fa fa-lightbulb-o mr-1 text-emerald-600"></i>
+                    建议：距离短期目标差距 ¥${shortGap.toFixed(0)}/月，日均需 ¥${(shortGap / 30).toFixed(0)}。
+                    ${shortGap > 10000 ? '考虑增加新的收入来源。' : '优化现有渠道，提高产出效率。'}
+                </div>` : '<div class="mt-3 p-3 bg-green-50 rounded text-sm"><i class="fa fa-check-circle mr-1 text-green-600"></i>恭喜！本月已达成短期目标！</div>'}
+            `;
+        }
+
+        // ---------- CSV导出 ----------
+        function exportCSV() {
+            if (records.length === 0) { alert('暂无数据可导出'); return; }
+            let csv = '来源,金额,月份,年份,备注\n';
+            records.forEach(r => { csv += `${r.source},${r.amount},${r.month},${r.year},${r.note || ''}\n`; });
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `被动收入_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        // ---------- 收入推荐 ----------
+        function renderIdeas() {
+            const grid = document.getElementById('ideaGrid');
+            grid.innerHTML = INCOME_IDEAS.map(idea =>
+                `<div class="p-4 border rounded-lg bg-white hover:shadow-md transition">
+                    <h4 class="font-medium text-emerald-700">${idea.name}</h4>
+                    <p class="text-xs text-gray-500 mt-1">${idea.desc}</p>
+                    <div class="text-xs text-gray-600 mt-2"><span class="font-medium">平台：</span>${idea.platforms}</div>
+                    <div class="text-xs text-emerald-600 font-medium mt-1">${idea.income} | ${idea.effort}</div>
+                </div>`
+            ).join('');
+        }
+
+        function showToast(msg) {
+            const el = document.getElementById('toast') || (() => {
+                const t = document.createElement('div');
+                t.id = 'toast';
+                t.className = 'fixed bottom-6 right-6 bg-gray-800 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium z-50 transition-all duration-300';
+                document.body.appendChild(t); return t;
+            })();
+            el.textContent = msg; el.classList.remove('hidden', 'opacity-0'); el.classList.add('opacity-100');
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.classList.add('opacity-0'); setTimeout(() => el.classList.add('hidden'), 300); }, 2500);
+        }
+
+        // 初始化
+        const monthSel = document.getElementById('incomeMonth');
+        for (let m = 1; m <= 12; m++) monthSel.innerHTML += `<option value="${m}">${m}月</option>`;
+        monthSel.value = new Date().getMonth() + 1;
+        document.getElementById('incomeYear').value = new Date().getFullYear();
+
+        const yearSel = document.getElementById('filterYear');
+        yearSel.innerHTML = '<option value="0">全部年份</option>';
+        for (let y = new Date().getFullYear(); y >= 2020; y--) yearSel.innerHTML += `<option value="${y}">${y}年</option>`;
+
+        const srcSel = document.getElementById('filterSource');
+        srcSel.innerHTML = '<option value="all">全部来源</option>' + SOURCES.map(s => `<option value="${s}">${s}</option>`).join('');
+
+        const monthFilter = document.getElementById('filterMonth');
+        monthFilter.innerHTML = '<option value="all">全部月份</option>' + [1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}">${m}月</option>`).join('');
+
+        renderDashboard();
+        renderRecords();
+    </script>
+</body>
+</html>
